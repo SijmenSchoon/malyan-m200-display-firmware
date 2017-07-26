@@ -17,27 +17,24 @@ extern "C" {
 #define MADCTL_BGR 0x08
 #define MADCTL_MH  0x04
 
-HX8357::HX8357() : Adafruit_GFX(TFTWIDTH, TFTHEIGHT) {
+HX8357::HX8357() : Adafruit_GFX(TFTWIDTH, TFTHEIGHT) {}
 
-}
-
-void HX8357::init_spi() {
-    SpiAttr hSpiAttr;
-    hSpiAttr.bitOrder = SpiBitOrder_MSBFirst;
-    hSpiAttr.speed = SpiSpeed_80MHz;
-    hSpiAttr.mode = SpiMode_Master;
-    hSpiAttr.subMode = SpiSubMode_0;
-
-
-    // Init HSPI GPIO
+void HX8357::beginSPI() {
+    // Clear the 9th bit
     WRITE_PERI_REG(PERIPHS_IO_MUX, 0x105);
 
-    // Configure io to spi mode
+    // Configure IO to SPI mode
     PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTDI_U, 2);
     PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTCK_U, 2);
     PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTMS_U, 2);
     PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTDO_U, 2);
 
+    // Initialize the SPI settings
+    SpiAttr hSpiAttr;
+    hSpiAttr.bitOrder = SpiBitOrder_MSBFirst;
+    hSpiAttr.speed = SpiSpeed_80MHz;
+    hSpiAttr.mode = SpiMode_Master;
+    hSpiAttr.subMode = SpiSubMode_0;
     SPIInit(SpiNum_HSPI, &hSpiAttr);
 
     //
@@ -46,236 +43,91 @@ void HX8357::init_spi() {
     WRITE_PERI_REG(SPI_USER1(HSPI), ((8&SPI_USR_COMMAND_BITLEN)<<SPI_USR_COMMAND_BITLEN_S));
 }
 
+// XXX In the original code this was repeated twice. Why?
 void HX8357::begin() {
-    init_spi();
-
-    // Turns off the display, making it stop displaying the frame memory
-    // contents. Has no effect on the contents of the framebuffer.
-    write_command(HX8357_DISPOFF);
-    delay(10);
+    beginSPI();
+    displayOff();
 
     // Wakes the display from sleep mode.
-    write_command(HX8357_SLPOUT);
+    writeCommand(HX8357_SLPOUT);
     delay(120);
 
     // Set EQ function (seems to have something to do with timings, see p177)
-    write_command_data(HX8357_SETEQ, (const uint8_t[]){ 0x02, 0x01, 0x02, 0x01}, 4);
+    writeCommandData(HX8357_SETEQ, (const uint8_t[]){ 0x02, 0x01, 0x02, 0x01}, 4);
 
     // Undocumented, but sent by UI board
-    write_command_data(0xED, (const uint8_t[]){ 0x00, 0x00, 0x9A, 0x9A, 0x9B, 0x9B,
+    writeCommandData(0xED, (const uint8_t[]){ 0x00, 0x00, 0x9A, 0x9A, 0x9B, 0x9B,
                 0x00, 0x00, 0x00, 0x00, 0xAE, 0xAE, 0x01, 0xA2, 0x00 }, 15);
 
     // Select the DBI interface and the internal oscillation clock
-    write_command_data(HX8357_SETDISPLAY, (const uint8_t[]){ 0x00 }, 1);
+    writeCommandData(HX8357_SETDISPLAY, (const uint8_t[]){ 0x00 }, 1);
 
     // Set the internal clock division ratio to 1/1 and the inversion mode to
     // line inversion. Leaves the rest of the values to their defaults.
-    write_command_data(HX8357_SETNORTIM, (const uint8_t[]){ 0x10 }, 1);
+    writeCommandData(HX8357_SETNORTIM, (const uint8_t[]){ 0x10 }, 1);
 
     // Tweak LCD panel specific settings
-    write_command_data(HX8357_SETGAMMA, (const uint8_t[]){ 0x00, 0x46, 0x12,
+    writeCommandData(HX8357_SETGAMMA, (const uint8_t[]){ 0x00, 0x46, 0x12,
                 0x20, 0x0C, 0x00, 0x56, 0x12, 0x67, 0x02, 0x00, 0x0C}, 12);
-    write_command_data(HX8357_SETPOWER, (const uint8_t[]){ 0x44, 0x42, 0x06 }, 3);
-    write_command_data(HX8357_SETVCOM, (const uint8_t[]){ 0x43, 0x16 }, 2);
-    write_command_data(HX8357_SETNORPOW, (const uint8_t[]){ 0x04, 0x22 }, 2);
-    write_command_data(HX8357_SETPARPOW, (const uint8_t[]){ 0x04, 0x12 }, 2);
-    write_command_data(HX8357_SETIDLPOW, (const uint8_t[]){ 0x07, 0x12 }, 2);
-    write_command_data(HX8357_SETOSC, (const uint8_t[]){ 0x0C }, 1);
-
-    // data[0] = 0xA0;
-    // write_command_data(HX8357_MADCTL, data, 1); // Defines read/write scanning direction of frame memory.
+    writeCommandData(HX8357_SETPOWER, (const uint8_t[]){ 0x44, 0x42, 0x06 }, 3);
+    writeCommandData(HX8357_SETVCOM, (const uint8_t[]){ 0x43, 0x16 }, 2);
+    writeCommandData(HX8357_SETNORPOW, (const uint8_t[]){ 0x04, 0x22 }, 2);
+    writeCommandData(HX8357_SETPARPOW, (const uint8_t[]){ 0x04, 0x12 }, 2);
+    writeCommandData(HX8357_SETIDLPOW, (const uint8_t[]){ 0x07, 0x12 }, 2);
+    writeCommandData(HX8357_SETOSC, (const uint8_t[]){ 0x0C }, 1);
 
     // Set the Interface Pixel Format to 16 bits per pixel.
-    write_command_data(HX8357_COLMOD, (const uint8_t[]){ 0x55 }, 1);
+    writeCommandData(HX8357_COLMOD, (const uint8_t[]){ 0x55 }, 1);
 
-    // Set the start and end columns of the addressable area to the full
-    // display width (320 px). TODO Expose this as a public function.
-    write_command_data(HX8357_CASET, (const uint8_t[]){ 0x00, 0x00, 0x01, 0x3F }, 4);
-
-    // Set the start and end rows of the addressable area to the full
-    // display height (480 px). TODO Expose this as a public function.
-    write_command_data(HX8357_PASET, (const uint8_t[]) { 0x00, 0x00, 0x01, 0xE0 }, 4);
-
-
+    // Set the address window to the full width and height.
+    setAddressWindow(0, 0, 319, 480);
     delay(20);
 
+    // Disable the tearing effect line.
+    writeCommandData(HX8357_TEON, (const uint8_t[]){ 0x00 }, 1);
 
-    uint8_t data[16] = {0};
-    data[0] = 0x00;
-    write_command_data(HX8357_TEON, data, 1); // Turning Tearing Effect Line OFF
+    // Set the brightness of the display (0x00 - 0xFF).
+    writeCommandData(HX8357_WRDISBV, (const uint8_t[]){ 0x10 }, 1);
 
-    data[0] = 0x10;
-    write_command_data(HX8357_WRDISBV, data, 1); // This command is used to adjust the brightness value of the display. 0x00 = lowest, 0xFF = highest
+    // Enable backlight control, disable display dimming and enable the
+    // brightness registers.
+    writeCommandData(HX8357_WRCTRLD, (const uint8_t[]){ 0x24 }, 1);
 
+    // Disable content adaptive brightness control.
+    writeCommandData(HX8357_WRCABC, (const uint8_t[]){ 0x00 }, 1);
 
+    // Set the minimum brightness for the adaptive brightness control (even
+    // though it's disabled).
+    writeCommandData(HX8357_WRCABCMB, (const uint8_t[]){ 0x00 }, 1);
+}
 
-    data[0] = 0x24; // 0x24 = 00100100
-    //          |  ↳ BL: Backlight Control On/Off
-    //          ↳ Brightness Control Block On/Off, This bit is always used to switch brightness for display
-    write_command_data(HX8357_WRCTRLD, data, 1); // This command is used to control display brightness. Backlight
+void HX8357::displayOn() {
+    writeCommand(HX8357_DISPON);
+}
 
-
-
-    data[0] = 0x00; // Off
-    write_command_data(HX8357_WRCABC, data, 1); // Write Content Adaptive Brightness Control
-
-
-    data[0] = 0x00;
-    write_command_data(HX8357_WRCABCMB, data, 1); // This command is used to set the minimum brightness value of the display for CABC function.
-
-    delay(5);
-
-    write_command(HX8357_DISPOFF);
-
+void HX8357::displayOff() {
+    writeCommand(HX8357_DISPOFF);
     delay(10);
-
-    write_command(HX8357_SLPOUT);
-
-    delay(120); // has to be 120ms after display off
-
-    data[0] = 0x02;
-    data[1] = 0x01;
-    data[2] = 0x02;
-    data[3] = 0x01;
-    write_command_data(HX8357_SETEQ, data, 4); //Set EQ function (no idea what that does)
-
-
-    data[0] = 0x00;
-    data[1] = 0x00;
-    data[2] = 0x9A;
-    data[3] = 0x9A;
-    data[4] = 0x9B;
-    data[5] = 0x9B;
-    data[6] = 0x00;
-    data[7] = 0x00;
-    data[8] = 0x00;
-    data[9] = 0x00;
-    data[10] = 0xAE;
-    data[11] = 0xAE;
-    data[12] = 0x01;
-    data[13] = 0xA2;
-    data[14] = 0x00;
-    write_command_data(0xED, data, 15); // Not in HX8257 spec. but was transmitted by the MPSM UI Board
-
-
-    data[0] = 0x00;
-    write_command_data(HX8357_SETDISPLAY, data, 1); // DBI Interface (CPU) selected and set the display mode to internal oscillation clock
-
-    data[0] = 0x10;
-    write_command_data(HX8357_SETNORTIM, data, 1); // Parameter count does not match specification. Should be 3 parameters. MPSM was only sending one.
-
-
-    data[0] = 0x00;
-    data[1] = 0x46;
-    data[2] = 0x12;
-    data[3] = 0x20;
-    data[4] = 0x0C;
-    data[5] = 0x00;
-    data[6] = 0x56;
-    data[7] = 0x12;
-    data[8] = 0x67;
-    data[9] = 0x02;
-    data[10] = 0x00;
-    data[11] = 0x0C;
-    write_command_data(HX8357_SETGAMMA, data, 12); // "This command is used for Gamma Curve related Setting.". I'll just keep it as the MPSM is sending it.
-
-
-    data[0] = 0x44;
-    data[1] = 0x42;
-    data[2] = 0x06;
-    write_command_data(HX8357_SETPOWER, data, 3);
-
-
-    data[0] = 0x43;
-    data[1] = 0x16;
-    write_command_data(HX8357_SETVCOM, data, 2);
-
-    data[0] = 0x04;
-    data[1] = 0x22;
-    write_command_data(HX8357_SETNORPOW, data, 2);
-
-    data[0] = 0x04;
-    data[1] = 0x12;
-    write_command_data(HX8357_SETPARPOW, data, 2);
-
-    data[0] = 0x07;
-    data[1] = 0x12;
-    write_command_data(HX8357_SETIDLPOW, data, 2);
-
-
-    data[0] = 0x01;
-    write_command_data(HX8357_SETPANELREL, data, 1);
-
-    data[0] = 0x0C;
-    write_command_data(HX8357_SETOSC, data, 1);
-
-
-    data[0] = 0x55;
-    write_command_data(HX8357_COLMOD, data, 1); // Interface Pixel Format. Is set to 16 Bit per Pixel
-
-    data[0] = 0x00;
-    data[1] = 0x00;
-    data[2] = 0x01; //  0x013F = 319 Decimal (full width of display)
-    data[3] = 0x3F; //
-    write_command_data(HX8357_CASET, data, 4); // Column address set
-
-    data[0] = 0x00;
-    data[1] = 0x00;
-    data[2] = 0x01; //  0x01E0 = 480 Decimal (full height of display)
-    data[3] = 0xE0; //
-    write_command_data(HX8357_PASET, data, 4); // Page address set
-
-
-    delay(20);
-
-
-    data[0] = 0x00;
-    write_command_data(HX8357_TEON, data, 1); // Turning Tearing Effect Line OFF
-
-
-    data[0] = 0x10;
-    write_command_data(HX8357_WRDISBV, data, 1); // This command is used to adjust the brightness value of the display. 0x00 = lowest, 0xFF = highest
-
-
-    data[0] = 0x24; // 0x24 = 00100100
-    //          |  ↳ BL: Backlight Control On/Off
-    //          ↳ Brightness Control Block On/Off, This bit is always used to switch brightness for display
-    write_command_data(HX8357_WRCTRLD, data, 1); // This command is used to control display brightness. Backlight
-
-
-    data[0] = 0x00; // Off
-    write_command_data(HX8357_WRCABC, data, 1); // Write Content Adaptive Brightness Control
-
-
-    data[0] = 0x00;
-    write_command_data(HX8357_WRCABCMB, data, 1); // This command is used to set the minimum brightness value of the display for CABC function.
-
-    delay(5);
-
-
-    write_command(HX8357_DISPON); // Finally turn the display on (actually the internal clock) to see the GRAM content as it gets filled. Usually you first push all data through SPI and then turn it on. But we want to see whats happening :)
 }
 
-void HX8357::write_command(uint8_t cmd) {
-    // spi_txd(HSPI, 9, (0x00 << 8) | cmd);
+void HX8357::writeCommand(uint8_t cmd) {
     spi_lcd_9bit_write(HSPI, CMD, cmd);
-    // spi_mast_byte_write(HSPI, 0xFF);
 }
 
-void HX8357::write_command_data(uint8_t cmd, const uint8_t *data, uint8_t lenInBytes) {
-    write_command(cmd);
+void HX8357::writeCommandData(uint8_t cmd, const uint8_t *data, uint8_t lenInBytes) {
+    writeCommand(cmd);
 
-    // write_data(data, lenInBytes);
+    // writeData(data, lenInBytes);
     for (int i = 0; i < lenInBytes; i++) {
-        write_data(data[i]);
+        writeData(data[i]);
     }
 }
 
-void HX8357::write_data(uint8_t data) {
+void HX8357::writeData(uint8_t data) {
     spi_lcd_9bit_write(HSPI, DATA, data);
 }
 
-void HX8357::write_data(uint8_t *data, uint8_t lenInBytes) {
+void HX8357::writeData(uint8_t *data, uint8_t lenInBytes) {
     // spi_txd(HSPI, 9, (0x01 << 8) | data);
     // spi_lcd_9bit_write(HSPI, DATA, data);
 
@@ -319,112 +171,82 @@ void HX8357::write_data(uint8_t *data, uint8_t lenInBytes) {
 }
 
 void HX8357::drawPixel(int16_t x, int16_t y, uint16_t color) {
-    setAddrWindow(x, y, x, y);
-    write_data_rgb(color, 1);
+    setAddressWindow(x, y, x, y);
+    writeDataRGB(color, 1);
 }
 
-void HX8357::setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1) {
-    uint8_t data[4] = {0};
+void HX8357::setAddressWindow(uint16_t x0, uint16_t y0,
+                              uint16_t x1, uint16_t y1) {
+    const uint16_t columns[2] = { x0, x1 };
+    writeCommandData(HX8357_CASET, (const uint8_t *)columns, sizeof(columns));
 
-    // data[0] = x0 >> 8;
-    // data[1] = x0 & 0xFF;
-    // data[2] = x1 >> 8;
-    // data[3] = x1 & 0xFF;
-    // write_command_data(ILI9488_CASET, data, 4);
+    const uint16_t rows[2] = { y0, y1 };
+    writeCommandData(HX8357_PASET, (const uint8_t *)rows, sizeof(rows));
 
-    write_command(HX8357_CASET); // Column addr set
-    write_data(x0 >> 8);
-    write_data(x0 & 0xFF);     // XSTART
-    write_data(x1 >> 8);
-    write_data(x1 & 0xFF);     // XEND
-
-    write_command(HX8357_PASET); // Row addr set
-    write_data(y0>>8);
-    write_data(y0);     // YSTART
-    write_data(y1>>8);
-    write_data(y1);     // YEND
-
-    // data[0] = y0>>8;
-    // data[1] = y0;
-    // data[2] = y1>>8;
-    // data[3] = y1;
-    // write_command_data(ILI9488_PASET, data, 4);
-
-    write_command(HX83h7_RAMWR); // write to RAM
+    writeCommand(HX83h7_RAMWR); // write to RAM
 }
 
-void HX8357::write_data_rgb(uint16_t color, uint32_t repeats){
+void HX8357::writeDataRGB(uint16_t color, uint32_t repeats){
 
 #ifdef USE_3_BIT_COLORS
-    while(repeats > 0)
-    {
-        write_data((uint8_t)color);
-        repeats--;
+    for (; repeats > 0; repeats--) {
+        writeData((uint8_t)color);
     }
 #endif
 #ifdef USE_16_BIT_COLORS
-    // uint16_t r = (color & 0x00FF0000)>>16;
-    // r&=0x1FC;
-    // uint16_t g = (color & 0x0000FF00)>>8;
-    // g&=0x1FC;
-    // uint16_t b = (color & 0x000000FF);
-    // b&=0x1FC;
-
     uint8_t data[3] = {0};
 
     int r = ((color >> 11) & 0x1F);  // Extract the 5 R bits
     int g = ((color >> 5) & 0x3F);   // Extract the 6 G bits
     int b = ((color) & 0x1F);        // Extract the 5 B bits
 
-    while(repeats > 0)
-    {
-
+    for (; repeats > 0; repeats--) {
+        // TODO implement this
         // FF FF
         // 0000 0000 0000 0000
 
-        //  write_data(r);
-        //  write_data(g);
-        //  write_data(b);
+        //  writeData(r);
+        //  writeData(g);
+        //  writeData(b);
         // map(0x00, 0xFC)
-        write_data(0x0);
-        write_data(0x0);
-        write_data(0x0);
+        writeData(0x0);
+        writeData(0x0);
+        writeData(0x0);
         //  data[0] = r;
         //  data[1] = g;
         //  data[2] = b;
-        //  write_data(data, 3);
-        repeats--;
+        //  writeData(data, 3);
     }
 #endif
 
 };
 
-void HX8357::setRotation(uint8_t m) {
+void HX8357::setRotation(uint8_t rotation) {
+    writeCommand(HX8357_MADCTL);
 
-    uint8_t data;
-    uint8_t rotation = m % 4; // can't be higher than 3
-    switch (rotation) {
-    case 0:
-        data = MADCTL_MX | MADCTL_BGR;
+    switch (rotation % 4) {
+    case PORTRAIT:
+        writeData(MADCTL_MX | MADCTL_BGR);
         _width  = TFTWIDTH;
         _height = TFTHEIGHT;
         break;
-    case 1:
-        data = MADCTL_MV | MADCTL_BGR;
+
+    case LANDSCAPE:
+        writeData(MADCTL_MV | MADCTL_BGR);
         _width  = TFTHEIGHT;
         _height = TFTWIDTH;
         break;
-    case 2:
-        data = MADCTL_MY | MADCTL_BGR;
+
+    case REVERSE_PORTRAIT:
+        writeData(MADCTL_MY | MADCTL_BGR);
         _width  = TFTWIDTH;
         _height = TFTHEIGHT;
         break;
-    case 3:
-        data = MADCTL_MX | MADCTL_MY | MADCTL_MV | MADCTL_BGR;
+
+    case REVERSE_LANDSCAPE:
+        writeData(MADCTL_MX | MADCTL_MY | MADCTL_MV | MADCTL_BGR);
         _width  = TFTHEIGHT;
         _height = TFTWIDTH;
         break;
     }
-    write_command(HX8357_MADCTL);
-    write_data(data);
 }

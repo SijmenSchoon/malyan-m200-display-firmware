@@ -17,8 +17,8 @@ void setup() {
   Serial.println("Initializing Display...");
 
   display.begin();
-
-  display.setRotation(LANDSCAPE_RIGHT);
+  display.setRotation(LANDSCAPE);
+  display.displayOn();
 
   display.setCursor(10, 10);
   display.setTextSize(10);
