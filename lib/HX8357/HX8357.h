@@ -22,27 +22,21 @@
 
 
 class HX8357 : public Adafruit_GFX {
-
 private:
-void write_command(uint8_t cmd);
-void write_command_data(uint8_t cmd, uint8_t *data, uint8_t lenInBytes);
-void write_data(uint8_t data);
-void write_data(uint8_t *data, uint8_t lenInBytes);
-void write_data_rgb(uint16_t color, uint32_t repeats);
-void setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
+    void write_command(uint8_t cmd);
+    void write_command_data(uint8_t cmd, const uint8_t *data, uint8_t lenInBytes);
+    void write_data(uint8_t data);
+    void write_data(uint8_t *data, uint8_t lenInBytes);
+    void write_data_rgb(uint16_t color, uint32_t repeats);
+    void setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
+    void init_spi();
 
 public:
-
   HX8357();
 
   void begin();
-
   void drawPixel(int16_t x, int16_t y, uint16_t color);
-
   void setRotation(uint8_t m);
-
 };
-
-
 
 #endif
